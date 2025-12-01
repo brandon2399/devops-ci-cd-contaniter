@@ -78,17 +78,48 @@ stages:
         python3 -m pytest
       displayName: 'Automatic Testing (Pytest)'
 
-    # --- DOCKER BUILD & PUSH ---
+    # --- DOCKER BUILD---
     - task: Docker@2
-      displayName: 'Build and Push Docker Image'
+      displayName: 'Build Docker Image'
       inputs:
-        command: buildAndPush
+        command: build
         containerRegistry: $(dockerRegistryServiceConnection)
         repository: $(imageName)
         dockerfile: app/Dockerfile
         tags: |
           $(Build.BuildId)
           latest
+    
+    - script: |
+        echo ">>> INICIANDO ESCANEO DE IMAGEN CON TRIVY <<<"
+        # Comando: Escanear la imagen recién construida
+        # Usamos el tag que creamos en el paso anterior para escanear la imagen local
+        trivy image $(imageName):$(Build.BuildId) \
+        --severity HIGH,CRITICAL \
+        --format sarif \
+        --output $(System.DefaultWorkingDirectory)/trivy-image-report.sarif \
+        --exit-code 0
+      displayName: 'Scan Docker Image (Trivy)'
+
+    # --- PUBLISH EL REPORT SARIF ---
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish SARIF Security Report'
+      inputs:
+        pathToPublish: '$(System.DefaultWorkingDirectory)/trivy-image-report.sarif'
+        artifactName: 'Trivy-Report-SARIF-$(Build.BuildId)'
+
+    # --- PUSH DOCKER HUB  ---
+    - task: Docker@2
+      displayName: '6. Push Image to Docker Hub'
+      inputs:
+        command: push
+        containerRegistry: $(dockerRegistryServiceConnection)
+        repository: $(imageName)
+        tags: |
+          $(Build.BuildId)
+          latest
+
+
 - stage: CD
   displayName: Deploy K8s in EC2
   dependsOn: CI
