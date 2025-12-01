@@ -27,14 +27,18 @@ stages:
   - job: CI_Pipeline
     displayName: Security -> Test -> Build
     steps:
+    
+    # ---CHECKOUT---
     - checkout: self
       displayName: '0. Descargar Código Fuente (Checkout)'
-      clean: true    
-      fetchDepth: 1   
+      clean: true
+      fetchDepth: 1
+
+    # --- STATIC CODE REPORT XML (TRIVY) ---
     - script: |
-        echo ">>> INICIANDO ESCANEO DE SEGURIDAD <<<"
+        echo ">>> INICIANDO REVISIÓN ESTÁTICA CON TRIVY <<<"
         
-        # Instalación de Trivy (si no existe)
+        # Instalación de Trivy
         if ! command -v trivy &> /dev/null; then
             echo "Instalando Trivy..."
             sudo apt-get install wget apt-transport-https gnupg lsb-release -y
@@ -44,38 +48,53 @@ stages:
             sudo apt-get install trivy -y
         fi
         
-        echo "Ejecutando Trivy en el sistema de archivos..."
-        # Escanea buscando vulnerabilidades Altas y Críticas
-        # --exit-code 0 para reportar sin romper el pipeline (cámbialo a 1 para ser estricto)
-        trivy fs . --severity HIGH,CRITICAL --no-progress
-      displayName: 'Security Scan (Trivy)'
-  
+        echo "Ejecutando escaneo y generando reporte JUnit..."
+        # Ejecutamos Trivy, forzamos formato JUnit y guardamos el resultado en un archivo XML
+        # Usamos $(System.DefaultWorkingDirectory) para la ruta del archivo
+        trivy fs . \
+        --severity HIGH,CRITICAL \
+        --format junit \
+        --output $(System.DefaultWorkingDirectory)/trivy-report.xml \
+        --no-progress
+        
+      displayName: '1.1 Static Code Revision (Trivy) & Generate JUnit'
+
+    # --- PUBLISH'TESTS' ---
+    - task: PublishTestResults@2
+      displayName: '1.2 Publish Security Report to Tests Tab'
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/trivy-report.xml' 
+        mergeTestResults: true
+        testRunTitle: 'Trivy Security Report (Build $(Build.BuildId))'
+        failTaskOnFailedTests: false 
+    # ----------------------------------------------------------------------
+    
+    # ---  BUILD & TEST (PYTHON) ---
     - script: |
+        echo ">>> PREPARANDO ENTORNO PYTHON <<<"
         python3 -m pip install --upgrade pip
         pip3 install -r app/requirements.txt
         pip3 install pytest httpx
-      displayName: 'Automatic Testing (Pytest)'
-
-    - script: |
-        # Ejecutar pruebas unitarias (Requisito TDD)
-        # pytest # Descomenta esto cuando creemos los tests reales
+        
+        echo ">>> EJECUTANDO PRUEBAS AUTOMÁTICAS (TDD) <<<"
         cd app
         python3 -m pytest
-      displayName: 'Ejecutar Pruebas Unitarias (Pytest)'
+      displayName: '2. Automatic Testing (Pytest)'
 
+    # --- DOCKER BUILD & PUSH ---
     - task: Docker@2
-      displayName: Build and Push to Docker Hub
+      displayName: '3. Build and Push Docker Image'
       inputs:
         command: buildAndPush
-        repository: $(imageName)
-        dockerfile: $(dockerfilePath)
         containerRegistry: $(dockerRegistryServiceConnection)
+        repository: $(imageName)
+        dockerfile: app/Dockerfile
         tags: |
-          $(tag)
+          $(Build.BuildId)
           latest
-
 - stage: CD
-  displayName: Deploy to K8s
+  displayName: Deploy K8s in EC2
   dependsOn: CI
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
   jobs:
