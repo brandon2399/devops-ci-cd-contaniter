@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Infraestructura DevOps Assessment - EC2 con Docker y Kind
+
+Parameters:
+  KeyName:
+    Description: Nombre del KeyPair existente en AWS para entrar por SSH
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Debe ser el nombre de una Key Pair existente.
+  
+  InstanceType:
+    Description: Tipo de instancia EC2
+    Type: String
+    Default: t3.medium
+    AllowedValues: [t3.medium, t3.large, m5.large]
+
+Resources:
+  # 1. Grupo de Seguridad
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Permitir SSH, HTTP y puertos K8s NodePort
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 30000
+          ToPort: 32767
+          CidrIp: 0.0.0.0/0
+
+  # 2. Instancia EC2
+  DevOpsInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0c7217cdde317cfec  # Ubuntu 22.04 LTS en us-east-1 (Verificar región)
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroups: 
+        - !Ref InstanceSecurityGroup
+      Tags:
+        - Key: Name
+          Value: DevOps-Assessment-Node
+      # Script de instalación automática (User Data)
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          apt-get update -y
+          # Instalar Docker
+          apt-get install -y docker.io
+          usermod -aG docker ubuntu
+          systemctl enable docker
+          systemctl start docker
+          # Instalar Kubectl
+          snap install kubectl --classic
+          # Instalar Kind
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          chmod +x ./kind
+          mv ./kind /usr/local/bin/kind
+
+Outputs:
+  PublicIP:
+    Description: IP Publica de la instancia creada
+    Value: !GetAtt DevOpsInstance.PublicIp
