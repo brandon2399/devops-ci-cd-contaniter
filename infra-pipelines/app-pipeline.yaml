@@ -29,15 +29,10 @@ stages:
   - job: Build
     displayName: Build
     steps:
-    - task: UsePythonVersion@0
-      inputs:
-        versionSpec: '3.9'
-      displayName: 'Instalar Python 3.9'
-
     - script: |
-        python -m pip install --upgrade pip
-        pip install -r app/requirements.txt
-        pip install pytest httpx
+        python3 -m pip install --upgrade pip
+        pip3 install -r app/requirements.txt
+        pip3 install pytest httpx
       displayName: 'Instalar Dependencias'
 
     - script: |
