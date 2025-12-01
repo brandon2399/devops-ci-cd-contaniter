@@ -48,29 +48,25 @@ stages:
             sudo apt-get install trivy -y
         fi
         
-        echo "Ejecutando escaneo y generando reporte JUnit..."
-        # Ejecutamos Trivy, forzamos formato JUnit y guardamos el resultado en un archivo XML
-        # Usamos $(System.DefaultWorkingDirectory) para la ruta del archivo
+        echo "Ejecutando escaneo y generando reporte SARIF..."
+        # 2. Ejecutar Trivy, forzar formato SARIF y guardar el archivo .sarif
         trivy fs . \
         --severity HIGH,CRITICAL \
-        --format junit \
-        --output $(System.DefaultWorkingDirectory)/trivy-report.xml \
+        --format sarif \
+        --output $(System.DefaultWorkingDirectory)/trivy-report.sarif \
         --no-progress
         
-      displayName: '1.1 Static Code Revision (Trivy) & Generate JUnit'
+      displayName: '1.1 Static Code Revision (Trivy) & Generate SARIF'
 
-    # --- PUBLISH'TESTS' ---
-    - task: PublishTestResults@2
-      displayName: '1.2 Publish Security Report to Tests Tab'
+    # --- PUBLISH REPORT (Reporte SARIF) ---
+    - task: PublishBuildArtifacts@1
+      displayName: '1.2 Publish SARIF Security Report'
       inputs:
-        testResultsFormat: 'JUnit'
-        testResultsFiles: '**/trivy-report.xml' 
-        mergeTestResults: true
-        testRunTitle: 'Trivy Security Report (Build $(Build.BuildId))'
-        failTaskOnFailedTests: false 
-    # ----------------------------------------------------------------------
+        pathToPublish: '$(System.DefaultWorkingDirectory)/trivy-report.sarif'
+        artifactName: 'Trivy-Report-SARIF-$(Build.BuildId)'
+        artifactType: 'container'
     
-    # ---  BUILD & TEST (PYTHON) ---
+    # --- BUILD & TEST (PYTHON) ---
     - script: |
         echo ">>> PREPARANDO ENTORNO PYTHON <<<"
         python3 -m pip install --upgrade pip
