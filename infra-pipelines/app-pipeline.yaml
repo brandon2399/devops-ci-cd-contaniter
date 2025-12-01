@@ -68,33 +68,96 @@ stages:
         secureFile: '$(sshKeySecureFile)'
 
     - script: |
-        # Configurar permisos de la llave
         chmod 400 $(sshKey.secureFilePath)
         
-        # Conexión SSH para desplegar en Kind
-        # 1. Actualizamos la imagen en el deployment (si existe) o creamos los recursos
-        # Usamos StrictHostKeyChecking=no para evitar el prompt de confirmación
-        
         ssh -o StrictHostKeyChecking=no -i $(sshKey.secureFilePath) ubuntu@$(k8sMasterIP) "
-          # Aseguramos que Kind esté respondiendo
+          
+          # 1. Configurar Kind
+          cat <<EOF > kind-config.yaml
+        kind: Cluster
+        apiVersion: kind.x-k8s.io/v1alpha4
+        nodes:
+        - role: control-plane
+          extraPortMappings:
+          - containerPort: 30000
+            hostPort: 30000
+        - role: worker
+        EOF
+
+          # 2. Crear Cluster si no existe
+          # Usamos 'kind' como nombre por defecto
+          if ! sudo kind get clusters | grep -q 'kind'; then
+            echo 'Creando cluster...'
+            sudo kind create cluster --config kind-config.yaml
+          fi
+
+          # ### FIX IMPORTANTE: OBTENER LAS CREDENCIALES ###
+          # 1. Crear carpeta .kube si no existe
+          mkdir -p /home/ubuntu/.kube
+          
+          # 2. Extraer el kubeconfig del cluster (aunque sea de root) y guardarlo en el usuario ubuntu
+          sudo kind get kubeconfig --name kind > /home/ubuntu/.kube/config
+          
+          # 3. Dar permisos al usuario ubuntu para leer ese archivo
+          sudo chown ubuntu:ubuntu /home/ubuntu/.kube/config
+          chmod 600 /home/ubuntu/.kube/config
+          
+          # 4. Decirle a kubectl dónde está el archivo
           export KUBECONFIG=/home/ubuntu/.kube/config
+          # ##############################################
+
+          # 3. Generar Manifiestos
+          cat <<EOF > app.yaml
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: devops-api
+        spec:
+          replicas: 2
+          selector:
+            matchLabels:
+              app: devops-api
+          template:
+            metadata:
+              labels:
+                app: devops-api
+            spec:
+              containers:
+              - name: devops-api
+                image: $(imageName):$(Build.BuildId)
+                imagePullPolicy: Always
+                ports:
+                - containerPort: 8000
+                resources:
+                  limits:
+                    memory: '512Mi'
+                    cpu: '500m'
+        ---
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: devops-api-service
+        spec:
+          type: NodePort
+          selector:
+            app: devops-api
+          ports:
+          - protocol: TCP
+            port: 80
+            targetPort: 8000
+            nodePort: 30000
+        EOF
+
+          # 4. Desplegar
+          echo 'Aplicando configuración en Kubernetes...'
+          kubectl apply -f app.yaml
           
-          # Crear Deployment si no existe (Un comando simple imperative para el examen)
-          # En un mundo real copiaríamos los YAMLs, aquí forzamos la actualización de imagen
+          echo 'Actualizando imagen...'
+          kubectl set image deployment/devops-api devops-api=$(imageName):$(Build.BuildId)
           
-          kubectl create deployment devops-api --image=$(imageRepository):$(tag) --dry-run=client -o yaml > deployment.yaml
-          
-          # Agregamos configuración de escalado y puertos al yaml generado (truco rápido)
-          echo '---' >> deployment.yaml
-          kubectl create service nodeport devops-api --tcp=80:8000 --node-port=30000 --dry-run=client -o yaml >> deployment.yaml
-          
-          # Aplicar cambios
-          kubectl apply -f deployment.yaml
-          
-          # Forzar actualización de imagen si el deployment ya existía
-          kubectl set image deployment/devops-api devops-api=$(imageRepository):$(tag)
-          
-          # Verificar estado
+          echo 'Esperando despliegue...'
           kubectl rollout status deployment/devops-api
+          
+          echo '¡ÉXITO!'
         "
       displayName: 'Desplegar en Kubernetes Remoto'
