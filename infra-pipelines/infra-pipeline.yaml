@@ -14,6 +14,30 @@ variables:
   stackName: 'devops-assessment-stack'
 
 steps:
+
+- task: AWSCLI@1
+  displayName: 'Limpiar Stack en estado Rollback'
+  inputs:
+    awsCredentials: aws
+    regionName: '$(awsRegion)'
+    scriptType: 'inline'
+    inlineScript: |
+      # Verificamos el estado del stack
+      STATUS=$(aws cloudformation describe-stacks --stack-name $(stackName) --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
+      
+      echo "Estado actual del stack: $STATUS"
+      
+      if [ "$STATUS" == "ROLLBACK_COMPLETE" ]; then
+        echo "Detectado stack muerto. Eliminando..."
+        aws cloudformation delete-stack --stack-name $(stackName)
+        echo "Esperando a que se elimine..."
+        aws cloudformation wait stack-delete-complete --stack-name $(stackName)
+        echo "Stack eliminado. Listo para desplegar."
+      else
+        echo "El stack está limpio o no existe. Continuando..."
+      fi
+
+
 - task: AmazonWebServices.aws-vsts-tools.CloudFormationCreateOrUpdateStack.CloudFormationCreateOrUpdateStack@1
   displayName: 'Desplegar Infraestructura con CloudFormation'
   inputs:
