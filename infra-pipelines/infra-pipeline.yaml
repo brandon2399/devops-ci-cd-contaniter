@@ -7,7 +7,7 @@ trigger:
       - infra/* 
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: 'banco-pichincha'
 
 variables:
   awsRegion: 'us-east-1'
