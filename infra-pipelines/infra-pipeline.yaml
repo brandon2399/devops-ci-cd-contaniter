@@ -1,0 +1,33 @@
+trigger:
+  branches:
+    include:
+      - master
+  paths:
+    include:
+      - infra/* # Solo se ejecuta si hay cambios en la carpeta infra
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  awsRegion: 'us-east-1'
+  stackName: 'devops-assessment-stack'
+
+steps:
+- task: AmazonWebServices.aws-vsts-tools.CloudFormationCreateOrUpdateStack.CloudFormationCreateOrUpdateStack@1
+  displayName: 'Desplegar Infraestructura con CloudFormation'
+  inputs:
+    awsCredentials: 'AWS-Connection' # Nombre de tu Service Connection en ADO
+    regionName: '$(awsRegion)'
+    stackName: '$(stackName)'
+    templateSource: 'file'
+    templateFile: 'infra/ec2-k8s-stack.yaml'
+    templateParametersSource: 'inline'
+    templateParameters: |
+      [
+        {
+          "ParameterKey": "KeyName",
+          "ParameterValue": "mi-llave-pem" 
+        }
+      ]
+    # Cambia "mi-llave-pem" por el nombre real de tu par de claves en AWS
