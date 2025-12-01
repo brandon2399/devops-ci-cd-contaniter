@@ -4,7 +4,7 @@ trigger:
       - master
   paths:
     include:
-      - infra/* # Solo se ejecuta si hay cambios en la carpeta infra
+      - infra/* 
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -17,7 +17,7 @@ steps:
 - task: AmazonWebServices.aws-vsts-tools.CloudFormationCreateOrUpdateStack.CloudFormationCreateOrUpdateStack@1
   displayName: 'Desplegar Infraestructura con CloudFormation'
   inputs:
-    awsCredentials: 'AWS-Connection' # Nombre de tu Service Connection en ADO
+    awsCredentials: aws 
     regionName: '$(awsRegion)'
     stackName: '$(stackName)'
     templateSource: 'file'
@@ -27,7 +27,7 @@ steps:
       [
         {
           "ParameterKey": "KeyName",
-          "ParameterValue": "mi-llave-pem" 
+          "ParameterValue": "devops-key" 
         }
       ]
-    # Cambia "mi-llave-pem" por el nombre real de tu par de claves en AWS
+    
