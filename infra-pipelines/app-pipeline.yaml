@@ -159,21 +159,21 @@ stages:
           fi
 
           # ### FIX IMPORTANTE: OBTENER LAS CREDENCIALES ###
-          # 1. Crear carpeta .kube si no existe
+          # Crear carpeta .kube si no existe
           mkdir -p /home/ubuntu/.kube
           
-          # 2. Extraer el kubeconfig del cluster (aunque sea de root) y guardarlo en el usuario ubuntu
+          # Extraer el kubeconfig del cluster (aunque sea de root) y guardarlo en el usuario ubuntu
           sudo kind get kubeconfig --name kind > /home/ubuntu/.kube/config
           
-          # 3. Dar permisos al usuario ubuntu para leer ese archivo
+          # Dar permisos al usuario ubuntu para leer ese archivo
           sudo chown ubuntu:ubuntu /home/ubuntu/.kube/config
           chmod 600 /home/ubuntu/.kube/config
           
-          # 4. Decirle a kubectl dónde está el archivo
+          # Decirle a kubectl dónde está el archivo
           export KUBECONFIG=/home/ubuntu/.kube/config
           # ##############################################
 
-          # 3. Generar Manifiestos HPA agregado para Dynamic Grow
+          # Generar Manifiestos HPA agregado para Dynamic Grow
           echo 'Generando manifiestos...'
           cat <<EOF > app.yaml
         apiVersion: apps/v1
@@ -232,7 +232,7 @@ stages:
           targetCPUUtilizationPercentage: 70
         EOF
 
-          # 4. Desplegar
+          # Desplegar
           echo 'Aplicando configuración en Kubernetes...'
           kubectl apply -f app.yaml
           
