@@ -95,7 +95,7 @@ stages:
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
   jobs:
   - job: Deploy
-    displayName: Deploy via SSH
+    displayName: CD_Pipeline_Deploy k8s
     steps:
     - task: DownloadSecureFile@1
       name: sshKey
