@@ -60,7 +60,7 @@ stages:
 
     # --- PUBLISH REPORT (Reporte SARIF) ---
     - task: PublishBuildArtifacts@1
-      displayName: '1.2 Publish SARIF Security Report'
+      displayName: 'Publish SARIF Security Report'
       inputs:
         pathToPublish: '$(System.DefaultWorkingDirectory)/trivy-report.sarif'
         artifactName: 'Trivy-Report-SARIF-$(Build.BuildId)'
