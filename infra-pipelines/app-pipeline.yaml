@@ -67,7 +67,7 @@ stages:
       displayName: Build and Push to Docker Hub
       inputs:
         command: buildAndPush
-        repository: $(imageRepository)
+        repository: $(imageName)
         dockerfile: $(dockerfilePath)
         containerRegistry: $(dockerRegistryServiceConnection)
         tags: |
