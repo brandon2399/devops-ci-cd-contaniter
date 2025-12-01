@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-api
+spec:
+  replicas: 2 # Requisito: Mínimo dos nodos/pods
+  selector:
+    matchLabels:
+      app: devops-api
+  template:
+    metadata:
+      labels:
+        app: devops-api
+    spec:
+      containers:
+      - name: devops-api
+        image: brandon2399/devops-challenge:latest 
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: devops-api-service
+spec:
+  type: NodePort
+  selector:
+    app: devops-api
+  ports:
+  - protocol: TCP
+    port: 80        # Puerto interno del servicio
+    targetPort: 8000 # Puerto del contenedor Python
+    nodePort: 30000 # Puerto expuesto a internet
