@@ -28,6 +28,10 @@ steps:
         {
           "ParameterKey": "KeyName",
           "ParameterValue": "devops-key" 
+        },
+        {
+          "ParameterKey": "InstanceType",
+          "ParameterValue": "t2.micro"
         }
       ]
     
