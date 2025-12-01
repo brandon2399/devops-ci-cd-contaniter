@@ -1,17 +1,16 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Infraestructura DevOps Assessment - EC2 con Docker y Kind
+Description: Infraestructura DevOps Assessment - EC2 Free Tier con Swap y Kind
 
 Parameters:
   KeyName:
-    Description: Nombre del KeyPair existente en AWS para entrar por SSH
+    Description: Nombre EXACTO del KeyPair existente en AWS
     Type: AWS::EC2::KeyPair::KeyName
-    ConstraintDescription: Debe ser el nombre de una Key Pair existente.
   
   InstanceType:
     Description: Tipo de instancia EC2
     Type: String
-    Default: t3.medium
-    AllowedValues: [t3.medium, t3.large, m5.large]
+    Default: t2.micro 
+    AllowedValues: [t2.micro, t3.micro, t3.small, t3.medium]
 
 Resources:
   # 1. Grupo de Seguridad
@@ -37,7 +36,8 @@ Resources:
   DevOpsInstance:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: ami-0c7217cdde317cfec  # Ubuntu 22.04 LTS en us-east-1 (Verificar región)
+      # Buscamos Ubuntu 22.04 automáticamente
+      ImageId: '{{resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id}}'
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
       SecurityGroups: 
@@ -45,19 +45,36 @@ Resources:
       Tags:
         - Key: Name
           Value: DevOps-Assessment-Node
-      # Script de instalación automática (User Data)
+      
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 15 # Subimos un poco el disco para soportar el Swap
+            VolumeType: gp3
+
+      # TRUCO DE INGENIERÍA: Configurar SWAP para simular RAM
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
+          # 1. Crear memoria SWAP de 4GB para que Kubernetes no explote en la t2.micro
+          fallocate -l 4G /swapfile
+          chmod 600 /swapfile
+          mkswap /swapfile
+          swapon /swapfile
+          echo '/swapfile none swap sw 0 0' | tee -a /etc/fstab
+          
+          # 2. Ajustar el sistema para usar el swap agresivamente
+          sysctl vm.swappiness=30
+          
+          # 3. Instalación estándar
           apt-get update -y
-          # Instalar Docker
           apt-get install -y docker.io
           usermod -aG docker ubuntu
           systemctl enable docker
           systemctl start docker
-          # Instalar Kubectl
+          
           snap install kubectl --classic
-          # Instalar Kind
+          
           curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
           chmod +x ./kind
           mv ./kind /usr/local/bin/kind
