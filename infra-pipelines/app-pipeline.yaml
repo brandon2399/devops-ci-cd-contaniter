@@ -13,7 +13,7 @@ pool:
 
 variables:
   dockerRegistryServiceConnection: 'DockerHub-Connection' 
-  imageRepository: 'brandon2399/devops-challenge'
+  imageName: 'brandon2399/devops-challenge'
   containerRegistry: 'docker.io'
   dockerfilePath: '$(Build.SourcesDirectory)/app/Dockerfile'
   tag: '$(Build.BuildId)'
