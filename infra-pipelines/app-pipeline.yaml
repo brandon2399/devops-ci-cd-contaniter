@@ -110,7 +110,7 @@ stages:
 
     # --- PUSH DOCKER HUB  ---
     - task: Docker@2
-      displayName: '6. Push Image to Docker Hub'
+      displayName: 'Push Image to Docker Hub'
       inputs:
         command: push
         containerRegistry: $(dockerRegistryServiceConnection)
@@ -242,6 +242,6 @@ stages:
           echo 'Esperando despliegue...'
           kubectl rollout status deployment/devops-api
           
-          echo '¡ÉXITO!'
+          echo 'Deploy Complete'
         "
-      displayName: 'Desplegar en Kubernetes Remoto'
+      displayName: 'Desplegar en Kubernetes'
