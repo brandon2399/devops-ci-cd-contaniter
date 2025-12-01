@@ -106,7 +106,8 @@ stages:
           export KUBECONFIG=/home/ubuntu/.kube/config
           # ##############################################
 
-          # 3. Generar Manifiestos
+          # 3. Generar Manifiestos HPA agregado para Dynamic Grow
+          echo 'Generando manifiestos...'
           cat <<EOF > app.yaml
         apiVersion: apps/v1
         kind: Deployment
@@ -130,8 +131,11 @@ stages:
                 - containerPort: 8000
                 resources:
                   limits:
-                    memory: '512Mi'
+                    memory: '256Mi'
                     cpu: '500m'
+                  requests:
+                    memory: '128Mi'
+                    cpu: '250m'
         ---
         apiVersion: v1
         kind: Service
@@ -146,6 +150,19 @@ stages:
             port: 80
             targetPort: 8000
             nodePort: 30000
+        ---
+        apiVersion: autoscaling/v1
+        kind: HorizontalPodAutoscaler
+        metadata:
+          name: devops-api-hpa
+        spec:
+          scaleTargetRef:
+            apiVersion: apps/v1
+            kind: Deployment
+            name: devops-api
+          minReplicas: 2
+          maxReplicas: 5
+          targetCPUUtilizationPercentage: 70
         EOF
 
           # 4. Desplegar
