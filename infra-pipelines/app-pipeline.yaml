@@ -25,7 +25,7 @@ stages:
   displayName: Continuous Integration
   jobs:
   - job: CI_Pipeline
-    displayName: Security -> Test -> Build
+    displayName: CI_Pipeline (Static code -> Test -> Build)
     steps:
     
     # ---CHECKOUT---
