@@ -38,8 +38,9 @@ stages:
     - script: |
         # Ejecutar pruebas unitarias (Requisito TDD)
         # pytest # Descomenta esto cuando creemos los tests reales
-        echo "Tests pasaron correctamente (Simulado)"
-      displayName: 'Run Tests'
+        cd app
+        python3 -m pytest
+      displayName: 'Ejecutar Pruebas Unitarias (Pytest)'
 
     - task: Docker@2
       displayName: Build and Push to Docker Hub
