@@ -17,23 +17,44 @@ variables:
   containerRegistry: 'docker.io'
   dockerfilePath: '$(Build.SourcesDirectory)/app/Dockerfile'
   tag: '$(Build.BuildId)'
-
-  # Lo ideal es obtenerla dinámicamente
   k8sMasterIP: 13.218.91.114
   sshKeySecureFile: 'devops-key.pem'
 
 stages:
 - stage: CI
-  displayName: Build and Push
+  displayName: Continuous Integration
   jobs:
-  - job: Build
-    displayName: Build
+  - job: CI_Pipeline
+    displayName: Security -> Test -> Build
     steps:
+    - checkout: self
+      displayName: '0. Descargar Código Fuente (Checkout)'
+      clean: true    
+      fetchDepth: 1   
+    - script: |
+        echo ">>> INICIANDO ESCANEO DE SEGURIDAD <<<"
+        
+        # Instalación de Trivy (si no existe)
+        if ! command -v trivy &> /dev/null; then
+            echo "Instalando Trivy..."
+            sudo apt-get install wget apt-transport-https gnupg lsb-release -y
+            wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+            echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+            sudo apt-get update
+            sudo apt-get install trivy -y
+        fi
+        
+        echo "Ejecutando Trivy en el sistema de archivos..."
+        # Escanea buscando vulnerabilidades Altas y Críticas
+        # --exit-code 0 para reportar sin romper el pipeline (cámbialo a 1 para ser estricto)
+        trivy fs . --severity HIGH,CRITICAL --no-progress
+      displayName: 'Security Scan (Trivy)'
+  
     - script: |
         python3 -m pip install --upgrade pip
         pip3 install -r app/requirements.txt
         pip3 install pytest httpx
-      displayName: 'Instalar Dependencias'
+      displayName: 'Automatic Testing (Pytest)'
 
     - script: |
         # Ejecutar pruebas unitarias (Requisito TDD)
