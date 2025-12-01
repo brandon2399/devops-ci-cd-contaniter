@@ -4,13 +4,13 @@ Description: Infraestructura DevOps Assessment - EC2 Free Tier con Swap y Kind
 Parameters:
   KeyName:
     Description: Nombre EXACTO del KeyPair existente en AWS
-    Type: AWS::EC2::KeyPair::KeyName
+    Type: AWS::EC2::KeyPair::devops-key
   
   InstanceType:
     Description: Tipo de instancia EC2
     Type: String
     Default: t2.micro 
-    AllowedValues: [t2.micro, t3.micro, t3.small, t3.medium]
+    AllowedValues: [t2.micro]
 
 Resources:
   # 1. Grupo de Seguridad
