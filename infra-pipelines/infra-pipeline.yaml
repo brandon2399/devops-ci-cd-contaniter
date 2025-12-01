@@ -15,24 +15,6 @@ variables:
 
 steps:
 
-# - task: AWSCLI@2 
-#   displayName: 'Limpiar Stack en estado Rollback'
-#   inputs:
-#     awsCredentials: aws
-#     regionName: '$(awsRegion)'
-#     scriptType: 'bash'            
-#     scriptLocation: 'inlineScript' 
-#     inlineScript: |
-#       STATUS=$(aws cloudformation describe-stacks --stack-name $(stackName) --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
-#       echo "Estado actual del stack: $STATUS"
-#       if [ "$STATUS" == "ROLLBACK_COMPLETE" ]; then
-#         echo "Detectado stack muerto. Eliminando..."
-#         aws cloudformation delete-stack --stack-name $(stackName)
-#         aws cloudformation wait stack-delete-complete --stack-name $(stackName)
-#         echo "Stack eliminado."
-#       fi
-
-
 - task: AmazonWebServices.aws-vsts-tools.CloudFormationCreateOrUpdateStack.CloudFormationCreateOrUpdateStack@1
   displayName: 'Desplegar Infraestructura con CloudFormation'
   inputs:
@@ -50,7 +32,7 @@ steps:
         },
         {
           "ParameterKey": "InstanceType",
-          "ParameterValue": "t2.micro"
+          "ParameterValue": "m7i-flex.large"
         }
       ]
     

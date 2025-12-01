@@ -9,8 +9,13 @@ Parameters:
   InstanceType:
     Description: Tipo de instancia EC2
     Type: String
-    Default: t2.micro 
-    AllowedValues: [t2.micro]
+    Default: m7i-flex.large
+    AllowedValues:
+      - m7i-flex.large
+      - t3.micro
+      - t3.small
+      - t4g.micro
+      - t4g.small
 
 Resources:
   # 1. Grupo de Seguridad
