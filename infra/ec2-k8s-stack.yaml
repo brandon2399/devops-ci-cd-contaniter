@@ -53,6 +53,9 @@ Resources:
   # 3. LOAD BALANCER CLÁSICO (CLB) - Endpoint principal
   ClassicLoadBalancer:
     Type: AWS::ElasticLoadBalancing::LoadBalancer
+    # --- FIX: FORZAMOS LA CREACIÓN DEL GRUPO DE SEGURIDAD PRIMERO ---
+    DependsOn: LBSecurityGroup
+    # -----------------------------------------------------------------
     Properties:
       Scheme: internet-facing
       Listeners:
@@ -60,7 +63,7 @@ Resources:
           InstancePort: 30000 # Apunta al NodePort de Kubernetes
           Protocol: HTTP
       HealthCheck:
-        Target: 'HTTP:30000/DevOps' # Health check apuntando al endpoint de la API
+        Target: 'HTTP:30000/DevOps'
         Interval: 30
         Timeout: 5
         UnhealthyThreshold: 2
@@ -68,11 +71,9 @@ Resources:
       Instances:
         - !Ref DevOpsInstance
       SecurityGroups:
-        # FIX: Aseguramos que el SG del LB sea usado
         - !Ref LBSecurityGroup
       Subnets:
-        # FIX: Se envuelve el Fn::GetAtt en una lista para cumplir con el requisito
-        - Fn::GetAtt: [DevOpsInstance, SubnetId] 
+        - Fn::GetAtt: [DevOpsInstance, SubnetId]
 
   # 4. INSTANCIA EC2 (El Host del Cluster Kind)
   DevOpsInstance:
