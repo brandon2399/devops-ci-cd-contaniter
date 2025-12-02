@@ -1,13 +1,13 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Infraestructura DevOps Assessment - EC2 K8s con Load Balancer Clásico
+Description: Infraestructura DevOps Assessment - EC2 + Kind + Classic Load Balancer
 
 Parameters:
   KeyName:
     Description: Nombre EXACTO del KeyPair existente en AWS
     Type: AWS::EC2::KeyPair::KeyName
-  
+
   InstanceType:
-    Description: Tipo de instancia EC2 (m7i-flex.large recomendada por recursos)
+    Description: Tipo de instancia EC2
     Type: String
     Default: m7i-flex.large
     AllowedValues:
@@ -16,105 +16,118 @@ Parameters:
       - m7i-flex.large
       - t4g.small
 
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-08534447fb897c953
+    Description: VPC donde se desplegará la solución
+
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Default: "subnet-0157fa56547864566,subnet-040da945635e17ca4,subnet-06bf78cc6507e8492,subnet-0a5b2b0b08ed0ca8a,subnet-0c63e9d63ed30689f,subnet-09c7605a883e75fd0"
+    Description: Subnets disponibles para el Load Balancer
+
 Resources:
-  # 1. GRUPO DE SEGURIDAD PARA LA INSTANCIA
+
+  # =======================================================
+  # SECURITY GROUP - EC2
+  # =======================================================
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Puertos SSH, HTTP y K8s NodePort
+      GroupDescription: Puertos SSH, HTTP y NodePort
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
-        # Acceso SSH desde cualquier lugar
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           CidrIp: 0.0.0.0/0
-        # Tráfico del Load Balancer (NodePort range)
         - IpProtocol: tcp
           FromPort: 30000
           ToPort: 32767 
           CidrIp: 0.0.0.0/0
-        # Puerto 80 directo
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
 
-  # 2. GRUPO DE SEGURIDAD PARA EL LOAD BALANCER
+  # =======================================================
+  # SECURITY GROUP - LOAD BALANCER
+  # =======================================================
   LBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Enable HTTP access to the Load Balancer
+      GroupDescription: Seguridad HTTP LB
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
 
-  # 3. LOAD BALANCER CLÁSICO (CLB) - Endpoint principal
-  ClassicLoadBalancer:
-    Type: AWS::ElasticLoadBalancing::LoadBalancer
-    # --- FIX: FORZAMOS LA CREACIÓN DEL GRUPO DE SEGURIDAD PRIMERO ---
-    DependsOn: LBSecurityGroup
-    # -----------------------------------------------------------------
-    Properties:
-      Scheme: internet-facing
-      Listeners:
-        - LoadBalancerPort: 80
-          InstancePort: 30000 # Apunta al NodePort de Kubernetes
-          Protocol: HTTP
-      HealthCheck:
-        Target: 'HTTP:30000/DevOps'
-        Interval: 30
-        Timeout: 5
-        UnhealthyThreshold: 2
-        HealthyThreshold: 10
-      Instances:
-        - !Ref DevOpsInstance
-      SecurityGroups:
-        - !Ref LBSecurityGroup
-      Subnets:
-        - Fn::GetAtt: [DevOpsInstance, SubnetId]
-
-  # 4. INSTANCIA EC2 (El Host del Cluster Kind)
+  # =======================================================
+  # INSTANCIA EC2 (KIND + Docker + kubectl)
+  # =======================================================
   DevOpsInstance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: '{{resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id}}'
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
-      SecurityGroups: 
+      SubnetId: !Select [ 0, !Ref Subnets ]
+      SecurityGroupIds:
         - !Ref InstanceSecurityGroup
       Tags:
         - Key: Name
           Value: DevOps-Assessment-Node
-      
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
             VolumeSize: 20
             VolumeType: gp3
-
-      # Script de instalación (Docker, Kubectl, Kind)
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          # 1. Instalación de herramientas
           apt-get update -y
           apt-get install -y docker.io
           usermod -aG docker ubuntu
           systemctl enable docker
           systemctl start docker
-          
+
           snap install kubectl --classic
-          
+
           curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
           chmod +x ./kind
           mv ./kind /usr/local/bin/kind
 
+  # =======================================================
+  # CLASSIC LOAD BALANCER
+  # =======================================================
+  ClassicLoadBalancer:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    DependsOn: LBSecurityGroup
+    Properties:
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref LBSecurityGroup
+      Listeners:
+        - LoadBalancerPort: 80
+          InstancePort: 30000
+          Protocol: HTTP
+      HealthCheck:
+        Target: "HTTP:30000/DevOps"
+        Interval: 30
+        Timeout: 5
+        UnhealthyThreshold: 2
+        HealthyThreshold: 10
+      Instances:
+        - !Ref DevOpsInstance
+      Subnets: !Ref Subnets
+
 Outputs:
-  PublicIP:
-    Description: IP Publica de la instancia (No usar directamente, usar DNS del LB)
+  InstancePublicIP:
+    Description: IP pública de la instancia
     Value: !GetAtt DevOpsInstance.PublicIp
+
   LoadBalancerDNS:
-    Description: DNS Name del Classic Load Balancer (ENDPOINT FINAL)
+    Description: DNS público del Load Balancer (ENDPOINT FINAL)
     Value: !GetAtt ClassicLoadBalancer.DNSName
