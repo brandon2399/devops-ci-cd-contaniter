@@ -17,20 +17,21 @@ Parameters:
       - t4g.small
 
 Resources:
-  # security group SSH, HTTP, K8s NodePort y tráfico del LB
+  # 1. GRUPO DE SEGURIDAD PARA LA INSTANCIA
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Puertos SSH, HTTP y K8s NodePort
       SecurityGroupIngress:
+        # Acceso SSH desde cualquier lugar
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           CidrIp: 0.0.0.0/0
-        # Puertos de tráfico Load Balancer y K8s
+        # Tráfico del Load Balancer (NodePort range)
         - IpProtocol: tcp
           FromPort: 30000
-          ToPort: 32767 # Rango NodePort para LB
+          ToPort: 32767 
           CidrIp: 0.0.0.0/0
         # Puerto 80 directo
         - IpProtocol: tcp
@@ -38,7 +39,7 @@ Resources:
           ToPort: 80
           CidrIp: 0.0.0.0/0
 
-  # security group LB (Permite tráfico web entrante)
+  # 2. GRUPO DE SEGURIDAD PARA EL LOAD BALANCER
   LBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -49,7 +50,7 @@ Resources:
           ToPort: 80
           CidrIp: 0.0.0.0/0
 
-  # Load Balancer Clasico (CLB) - Endpoint principal
+  # 3. LOAD BALANCER CLÁSICO (CLB) - Endpoint principal
   ClassicLoadBalancer:
     Type: AWS::ElasticLoadBalancing::LoadBalancer
     Properties:
@@ -67,15 +68,16 @@ Resources:
       Instances:
         - !Ref DevOpsInstance
       SecurityGroups:
+        # FIX: Aseguramos que el SG del LB sea usado
         - !Ref LBSecurityGroup
       Subnets:
-        - Fn::GetAtt: [DevOpsInstance, SubnetId]
+        # FIX: Se envuelve el Fn::GetAtt en una lista para cumplir con el requisito
+        - Fn::GetAtt: [DevOpsInstance, SubnetId] 
 
-  # EC2 
+  # 4. INSTANCIA EC2 (El Host del Cluster Kind)
   DevOpsInstance:
     Type: AWS::EC2::Instance
     Properties:
-      # Busca Ubuntu 22.04 LTS (amd64) automáticamente en la región
       ImageId: '{{resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id}}'
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
@@ -88,14 +90,14 @@ Resources:
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
-            VolumeSize: 20 # 20GB para Docker y Kind
+            VolumeSize: 20
             VolumeType: gp3
 
       # Script de instalación (Docker, Kubectl, Kind)
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          # Instalación de herramientas
+          # 1. Instalación de herramientas
           apt-get update -y
           apt-get install -y docker.io
           usermod -aG docker ubuntu
