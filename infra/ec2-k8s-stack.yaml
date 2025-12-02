@@ -68,8 +68,8 @@ Resources:
         - !Ref DevOpsInstance
       SecurityGroups:
         - !Ref LBSecurityGroup
-      Subnets: 
-        Fn::GetAtt: [DevOpsInstance, SubnetId] # misma subnet de la instancia
+      Subnets:
+        - Fn::GetAtt: [DevOpsInstance, SubnetId]
 
   # EC2 
   DevOpsInstance:
