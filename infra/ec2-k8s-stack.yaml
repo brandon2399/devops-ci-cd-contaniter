@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Infraestructura DevOps Assessment - EC2 Free Tier con Swap y Kind
+Description: Infraestructura DevOps Assessment - EC2 K8s con Load Balancer Clásico
 
 Parameters:
   KeyName:
@@ -7,41 +7,75 @@ Parameters:
     Type: AWS::EC2::KeyPair::KeyName
   
   InstanceType:
-    Description: Tipo de instancia EC2
+    Description: Tipo de instancia EC2 (m7i-flex.large recomendada por recursos)
     Type: String
     Default: m7i-flex.large
     AllowedValues:
-      - m7i-flex.large
       - t3.micro
       - t3.small
-      - t4g.micro
+      - m7i-flex.large
       - t4g.small
 
 Resources:
-  # 1. Grupo de Seguridad
+  # security group SSH, HTTP, K8s NodePort y tráfico del LB
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Permitir SSH, HTTP y puertos K8s NodePort
+      GroupDescription: Puertos SSH, HTTP y K8s NodePort
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           CidrIp: 0.0.0.0/0
+        # Puertos de tráfico Load Balancer y K8s
+        - IpProtocol: tcp
+          FromPort: 30000
+          ToPort: 32767 # Rango NodePort para LB
+          CidrIp: 0.0.0.0/0
+        # Puerto 80 directo
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
+
+  # security group LB (Permite tráfico web entrante)
+  LBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access to the Load Balancer
+      SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 30000
-          ToPort: 32767
+          FromPort: 80
+          ToPort: 80
           CidrIp: 0.0.0.0/0
 
-  # 2. Instancia EC2
+  # Load Balancer Clasico (CLB) - Endpoint principal
+  ClassicLoadBalancer:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Listeners:
+        - LoadBalancerPort: 80
+          InstancePort: 30000 # Apunta al NodePort de Kubernetes
+          Protocol: HTTP
+      HealthCheck:
+        Target: 'HTTP:30000/DevOps' # Health check apuntando al endpoint de la API
+        Interval: 30
+        Timeout: 5
+        UnhealthyThreshold: 2
+        HealthyThreshold: 10
+      Instances:
+        - !Ref DevOpsInstance
+      SecurityGroups:
+        - !Ref LBSecurityGroup
+      Subnets: 
+        Fn::GetAtt: [DevOpsInstance, SubnetId] # misma subnet de la instancia
+
+  # EC2 
   DevOpsInstance:
     Type: AWS::EC2::Instance
     Properties:
-      # Ubuntu 22.04 
+      # Busca Ubuntu 22.04 LTS (amd64) automáticamente en la región
       ImageId: '{{resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id}}'
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
@@ -54,14 +88,14 @@ Resources:
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
-            VolumeSize: 15 
+            VolumeSize: 20 # 20GB para Docker y Kind
             VolumeType: gp3
 
-      
+      # Script de instalación (Docker, Kubectl, Kind)
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          # Instalación estándar
+          # Instalación de herramientas
           apt-get update -y
           apt-get install -y docker.io
           usermod -aG docker ubuntu
@@ -76,5 +110,8 @@ Resources:
 
 Outputs:
   PublicIP:
-    Description: IP Publica de la instancia creada
+    Description: IP Publica de la instancia (No usar directamente, usar DNS del LB)
     Value: !GetAtt DevOpsInstance.PublicIp
+  LoadBalancerDNS:
+    Description: DNS Name del Classic Load Balancer (ENDPOINT FINAL)
+    Value: !GetAtt ClassicLoadBalancer.DNSName
