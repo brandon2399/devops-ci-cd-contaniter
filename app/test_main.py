@@ -4,7 +4,7 @@ import jwt
 import time
 import uuid
 
-# Creamos un cliente de pruebas que simula peticiones HTTP sin levantar el servidor real
+# client y simulacion de peticiones HTTP 
 client = TestClient(app)
 
 def generate_valid_token():
@@ -46,12 +46,12 @@ def test_devops_invalid_api_key():
     
     response = client.post("/DevOps", json=data, headers=headers)
     
-    # Según tu código devuelve 403 Forbidden o el string ERROR
+    # 403 Forbidden o el string ERROR
     assert response.status_code == 403 or response.text == "ERROR"
 
 def test_devops_invalid_method_get():
     """Prueba que cualquier otro método (GET) responda ERROR"""
-    # Incluso con headers validos, el GET debe fallar
+    # headers validos, el GET debe fallar
     token = generate_valid_token()
     headers = {
         "X-Parse-REST-API-Key": API_KEY_EXPECTED,
@@ -60,7 +60,7 @@ def test_devops_invalid_method_get():
     
     response = client.get("/DevOps", headers=headers)
     
-    # El requisito dice: Cualquier otro método HTTP debe responder: "ERROR"
+    # Cualquier otro método HTTP debe responder: "ERROR"
     assert response.text == "ERROR"
     assert response.status_code == 405
 
@@ -77,6 +77,6 @@ def test_jwt_replay_attack():
     response1 = client.post("/DevOps", json=data, headers=headers)
     assert response1.status_code == 200
     
-    # Segunda llamada con MISMO token: Fallo
+    # Segunda peticion con MISMO token: Faile
     response2 = client.post("/DevOps", json=data, headers=headers)
     assert response2.status_code == 401
