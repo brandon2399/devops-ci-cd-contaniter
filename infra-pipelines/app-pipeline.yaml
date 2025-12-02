@@ -17,7 +17,7 @@ variables:
   containerRegistry: 'docker.io'
   dockerfilePath: '$(Build.SourcesDirectory)/app/Dockerfile'
   tag: '$(Build.BuildId)'
-  k8sMasterIP: 3.89.225.128
+  k8sMasterIP: 52.90.249.39
   sshKeySecureFile: 'devops-key.pem'
 
 stages:
